@@ -1,35 +1,25 @@
-# spending_tracker.py
-
+# spending_tracker.p
 import yaml
 import hashlib
 import sqlite3
 import os
 import importlib
-import matplotlib.pyplot as plt
 import pandas as pd
 
-from data.importers import CapitalOneImporter
+from data.importers import CapitalOneImporter, AmexImporter
 from data.metrics import FinancialReportService
-from datetime import datetime
+from utils.description_cleaner import DescriptionCleaner
+from utils.category_manager import CategoryManager
 from pathlib import Path
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
 
 
-DB_PATH = Path("data/spending_tracker.db")
-
-
-def categorize_transaction(transaction):
-    # use config/categories.yaml to categorize transactions based on description or use default
-    transaction["category"] = "Misc"
-    return transaction
+PROJECT_ROOT = Path(__file__).parent
+CONFIG_DIR = PROJECT_ROOT / "config"
+DATA_DIR = PROJECT_ROOT / "data"
+DB_PATH = Path(DATA_DIR / "spending_tracker.db")
 
 
 def resolve_importer(importer_spec):
-    # importer_spec may be:
-    # - a callable class object
-    # - a string with class name in data.importers (e.g. "CapitalOneImporter")
-    # - a dotted path "data.importers.CapitalOneImporter"
     if callable(importer_spec):
         return importer_spec
 
@@ -55,12 +45,21 @@ def resolve_importer(importer_spec):
 
 
 def import_transactions():
-    # create a SQLite database connection
+    import_summary = []
+    new_transactions = []
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(CONFIG_DIR / "categories.yaml", "r") as f:
+        categories_config = yaml.safe_load(f)["categories"]
+
+    category_manager = CategoryManager(str(DB_PATH), categories_config)
+
+    # initialize description cleaner
+    cleaner = DescriptionCleaner(CONFIG_DIR / "descriptions.yaml")
 
     with sqlite3.connect(str(DB_PATH)) as conn:
         cursor = conn.cursor()
-        with open("config/accounts.yaml", "r") as f:
+        with open(CONFIG_DIR / "accounts.yaml", "r") as f:
             config = yaml.safe_load(f)
             for account in config.get("accounts", []):
                 default_path = "/home/wandored/Projects/spending-tracker/data/"
@@ -89,6 +88,8 @@ def import_transactions():
                         f"Importer for '{account_name}' does not provide callable 'import_data' method"
                     )
                     continue
+                inserted = 0
+                duplicates = 0
                 transactions = import_fn()
 
                 for transaction in transactions:
@@ -100,21 +101,16 @@ def import_transactions():
                         print(f"Skipping malformed transaction: {transaction}")
                         continue
 
-                    # convert date to YYYY-MM-DD format
-                    try:
-                        transaction["transaction_date"] = datetime.strptime(
-                            transaction["transaction_date"], "%m/%d/%y"
-                        ).strftime("%Y-%m-%d")
-                    except ValueError:
-                        print(
-                            f"Error parsing date '{transaction['transaction_date']}' for transaction: {transaction}"
-                        )
-                        continue
+                    # clean descriptions
+                    description = transaction["description"]
+                    transaction["description"] = cleaner.clean(description)
 
                     # add category
-                    transaction = categorize_transaction(transaction)
+                    transaction["category"] = category_manager.get_category(
+                        transaction["description"]
+                    )
 
-                    # add account_id and account_name to transaction for reference
+                    # add account_id to transaction for reference
                     transaction["account_id"] = account_id
 
                     # Generate a unique hash for each transaction using its date, description, type, and amount
@@ -150,223 +146,110 @@ def import_transactions():
                                 transaction["imported_hash"],
                             ),
                         )
+                        if cursor.rowcount == 1:
+                            inserted += 1
+
+                            new_transactions.append(
+                                {
+                                    "Date": transaction["transaction_date"],
+                                    "Account": account_name,
+                                    "Type": transaction["transaction_type"].title(),
+                                    "Description": transaction["description"],
+                                    "Category": transaction["category"],
+                                    "Amount": transaction["amount"],
+                                }
+                            )
+                        else:
+                            duplicates += 1
                         # Use the same connection to execute and commit
                     except Exception as e:
                         print(f"Failed to insert transaction: {e} - {transaction}")
+                import_summary.append(
+                    {
+                        "Account": account_name,
+                        "Imported": inserted,
+                        "Duplicates": duplicates,
+                        "Total Imported": inserted + duplicates,
+                    }
+                )
                 conn.commit()
 
+    return import_summary, new_transactions
 
-def report_metrics():
+
+def normalize_descriptions():
+    cleaner = DescriptionCleaner("config/descriptions.yaml")
+
+    with sqlite3.connect(str(DB_PATH)) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT id, description
+            FROM transactions
+        """)
+
+        updated = 0
+
+        for row in cursor.fetchall():
+            old_description = row["description"]
+            new_description = cleaner.clean(old_description)
+
+            if old_description != new_description:
+                cursor.execute(
+                    """
+                    UPDATE transactions
+                    SET description = ?
+                    WHERE id = ?
+                    """,
+                    (new_description, row["id"]),
+                )
+
+                updated += 1
+
+        conn.commit()
+
+
+def report_metrics(summary_df, transactions_df):
     report_service = FinancialReportService("data/spending_tracker.db")
-
     report = report_service.get_report_data()
+    # print(report["summary"])
+    #
+    # for row in report["account_balances"]:
+    #     print(row)
+    #
+    # for row in report["monthly_trend"]:
+    #     print(row)
+    # for row in report["top_descriptions"]:
+    #     print(row)
+    # for row in report["top_categories"]:
+    #     print(row)
+    if not transactions_df.empty:
+        transactions_df["Amount"] = transactions_df["Amount"].map("${:,.2f}".format)
+        transactions_df = transactions_df.sort_values(
+            ["Date", "Account"],
+            ascending=[False, True],
+        )
+        transactions_df.reset_index(drop=True, inplace=True)
 
-    print(report["summary"])
-
-    for row in report["account_balances"]:
-        print(row)
-
-    for row in report["monthly_trend"]:
-        print(row)
-
-    for row in report["top_descriptions"]:
-        print(row)
-
-    for row in report["top_categories"]:
-        print(row)
+    print(summary_df)
+    print()
+    print(transactions_df)
 
     return report
 
 
-def create_monthly_trend_chart(monthly_trend, output_file):
-
-    df = pd.DataFrame(monthly_trend)
-    df = df.sort_values("month")
-    df["rolling_avg"] = df["net"].rolling(window=12, min_periods=1).mean()
-
-    plt.figure(figsize=(10, 3))
-
-    plt.bar(
-        df["month"],
-        df["net"],
-    )
-
-    plt.plot(
-        df["month"],
-        df["rolling_avg"],
-        linewidth=2,
-    )
-
-    plt.title("Monthly Net Income")
-    plt.ylabel("Net Income")
-    plt.xticks(rotation=45)
-
-    plt.tight_layout()
-    plt.savefig(output_file)
-    plt.close()
-
-
-def draw_metric_box(
-    canvas,
-    x,
-    y,
-    width,
-    height,
-    title,
-    value,
-):
-
-    canvas.rect(
-        x,
-        y,
-        width,
-        height,
-    )
-
-    canvas.setFont(
-        "Helvetica-Bold",
-        10,
-    )
-
-    canvas.drawString(
-        x + 5,
-        y + height - 15,
-        title,
-    )
-
-    canvas.setFont(
-        "Helvetica",
-        14,
-    )
-
-    canvas.drawString(
-        x + 5,
-        y + 15,
-        value,
-    )
-
-
-def create_pdf(report, pdf_file):
-
-    c = canvas.Canvas(
-        pdf_file,
-        pagesize=letter,
-    )
-
-    page_width, page_height = letter
-
-    #
-    # Chart
-    #
-
-    c.drawImage(
-        "monthly_trend.png",
-        40,
-        page_height - 280,
-        width=530,
-        height=200,
-    )
-
-    #
-    # Metric Boxes
-    #
-
-    summary = report["summary"]
-
-    metrics = [
-        ("Balance", summary.total_balance),
-        ("Avg Income", summary.avg_monthly_income),
-        ("Avg Expense", summary.avg_monthly_expense),
-        ("Month Net", summary.month_net),
-        ("Quarter Net", summary.quarter_net),
-        ("Year Net", summary.year_net),
-        ("TTM Net", summary.trailing_12_month_net),
-    ]
-
-    x = 40
-    y = page_height - 420
-
-    for i, (title, value) in enumerate(metrics):
-        draw_metric_box(
-            c,
-            x,
-            y,
-            120,
-            50,
-            title,
-            f"${value:,.2f}",
-        )
-
-        x += 130
-
-        if (i + 1) % 4 == 0:
-            x = 40
-            y -= 60
-
-    #
-    # Top Descriptions
-    #
-
-    desc_x = 40
-    desc_y = 180
-
-    c.setFont(
-        "Helvetica-Bold",
-        12,
-    )
-
-    c.drawString(
-        desc_x,
-        desc_y + 120,
-        "Top Descriptions",
-    )
-
-    c.setFont(
-        "Helvetica",
-        10,
-    )
-
-    for i, row in enumerate(report["top_descriptions"]):
-        c.drawString(
-            desc_x,
-            desc_y + 100 - (i * 12),
-            f"{row['description'][:25]:25} ${row['total']:,.0f}",
-        )
-
-    #
-    # Top Categories
-    #
-
-    cat_x = 320
-
-    c.setFont(
-        "Helvetica-Bold",
-        12,
-    )
-
-    c.drawString(
-        cat_x,
-        desc_y + 120,
-        "Top Categories",
-    )
-
-    c.setFont(
-        "Helvetica",
-        10,
-    )
-
-    for i, row in enumerate(report["top_categories"]):
-        c.drawString(
-            cat_x,
-            desc_y + 100 - (i * 12),
-            f"{row['category'][:25]:25} ${row['total']:,.0f}",
-        )
-
-    c.save()
-
-
 if __name__ == "__main__":
-    import_transactions()
-    report = report_metrics()
-    create_monthly_trend_chart(report["monthly_trend"], "monthly_trend.png")
-    create_pdf(report, "financial_report.pdf")
+    import_summary, new_transactions = import_transactions()
+
+    with open(CONFIG_DIR / "categories.yaml", "r") as f:
+        categories_config = yaml.safe_load(f)["categories"]
+        category_manager = CategoryManager(str(DB_PATH), categories_config)
+        category_manager.sync_database()
+
+    normalize_descriptions()
+
+    summary_df = pd.DataFrame(import_summary)
+    transactions_df = pd.DataFrame(new_transactions)
+
+    report = report_metrics(summary_df, transactions_df)

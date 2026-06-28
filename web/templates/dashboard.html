@@ -1,5 +1,4 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html <html>
 
 <head>
   <title>Spending Tracker</title>
@@ -19,15 +18,16 @@
       <div class="col">
         <div class="card">
           <div class="card-body">
-            <h6>Total Balance</h6>
+            <h6>Cash Balance</h6>
             <h3>
               ${{ "{:,.2f}".format(
-              report.summary.total_balance
+              report.summary.cash_balance
               ) }}
             </h3>
           </div>
         </div>
       </div>
+
       <div class="col">
         <div class="card">
           <div class="card-body">
@@ -54,6 +54,62 @@
         </div>
       </div>
 
+      <div class="row mt-4">
+
+        <div class="col">
+          <div class="card">
+            <div class="card-body">
+              <h6>Trailing 12 Month Balance</h6>
+              <h3>
+                ${{ "{:,.2f}".format(
+                report.summary.trailing_12_month_net
+                ) }}
+              </h3>
+            </div>
+          </div>
+        </div>
+
+        <div class="col">
+          <div class="card">
+            <div class="card-body">
+              <h6>Current Month Balance</h6>
+              <h3>
+                ${{ "{:,.2f}".format(
+                report.summary.month_net
+                ) }}
+              </h3>
+            </div>
+          </div>
+        </div>
+
+        <div class="col">
+          <div class="card">
+            <div class="card-body">
+              <h6>Current Quarter Balance</h6>
+              <h3>
+                ${{ "{:,.2f}".format(
+                report.summary.quarter_net
+                ) }}
+              </h3>
+            </div>
+          </div>
+        </div>
+
+        <div class="col">
+          <div class="card">
+            <div class="card-body">
+              <h6>Current Year Balance</h6>
+              <h3>
+                ${{ "{:,.2f}".format(
+                report.summary.year_net
+                ) }}
+              </h3>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
     </div>
 
     <div class="container mt-4">
@@ -77,29 +133,6 @@
       </div>
     </div>
     <div class="row">
-      <h3 class="mt-4">Account Balances</h3>
-
-      <table class="table table-striped">
-        <thead>
-          <tr>
-            <th>Account</th>
-            <th class="text-end">Balance</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {% for account in report.account_balances %}
-          <tr>
-            <td>{{ account.account_name }}</td>
-            <td class="text-end">
-              ${{ "{:,.2f}".format(account.balance) }}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <div class="row">
       <h3 class="mt-4">Top 10 Expenses</h3>
       <div class="col">
         <div class="card">
@@ -109,7 +142,9 @@
               <thead>
                 <tr>
                   <th>Description</th>
-                  <th class="text-end">Total</th>
+                  <th>Total</th>
+                  <th>Count</th>
+                  <th class="text-end">Avg</th>
                 </tr>
               </thead>
 
@@ -117,8 +152,14 @@
                 {% for expense in report.top_descriptions %}
                 <tr>
                   <td>{{ expense.description }}</td>
-                  <td class="text-end">
+                  <td>
                     ${{ "{:,.2f}".format(expense.total) }}
+                  </td>
+                  <td>
+                    {{ (expense.count) }}
+                  </td>
+                  <td class="text-end">
+                    ${{ "{:,.2f}".format(expense.transaction_average) }}
                   </td>
                 </tr>
                 {% endfor %}
@@ -135,7 +176,9 @@
               <thead>
                 <tr>
                   <th>Category</th>
-                  <th class="text-end">Total</th>
+                  <th>Total</th>
+                  <th>Avg</th>
+                  <th class="text-end">Count</th>
                 </tr>
               </thead>
 
@@ -143,8 +186,14 @@
                 {% for expense in report.top_categories %}
                 <tr>
                   <td>{{ expense.category }}</td>
-                  <td class="text-end">
+                  <td>
                     ${{ "{:,.2f}".format(expense.total) }}
+                  </td>
+                  <td>
+                    {{ "{:,.1f}".format(expense.percentage_of_total) }}%
+                  </td>
+                  <td class="text-end">
+                    {{ (expense.count) }}
                   </td>
                 </tr>
                 {% endfor %}
