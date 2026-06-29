@@ -6,8 +6,13 @@ import os
 import importlib
 import pandas as pd
 
-from data.importers import CapitalOneImporter, AmexImporter
-from data.metrics import FinancialReportService
+from utils.importers import (
+    CapitalOneImporter,
+    AmexImporter,
+    CitiImporter,
+    BPCardImporter,
+)
+from utils.metrics import FinancialReportService
 from utils.description_cleaner import DescriptionCleaner
 from utils.category_manager import CategoryManager
 from pathlib import Path
@@ -224,6 +229,7 @@ def report_metrics(summary_df, transactions_df):
     #     print(row)
     # for row in report["top_categories"]:
     #     print(row)
+    print()
     if not transactions_df.empty:
         transactions_df["Amount"] = transactions_df["Amount"].map("${:,.2f}".format)
         transactions_df = transactions_df.sort_values(
@@ -240,7 +246,7 @@ def report_metrics(summary_df, transactions_df):
 
 
 if __name__ == "__main__":
-    # import_summary, new_transactions = import_transactions()
+    import_summary, new_transactions = import_transactions()
 
     with open(CONFIG_DIR / "categories.yaml", "r") as f:
         categories_config = yaml.safe_load(f)["categories"]
@@ -249,7 +255,7 @@ if __name__ == "__main__":
 
     normalize_descriptions()
 
-    # summary_df = pd.DataFrame(import_summary)
-    # transactions_df = pd.DataFrame(new_transactions)
-    #
-    # report = report_metrics(summary_df, transactions_df)
+    summary_df = pd.DataFrame(import_summary)
+    transactions_df = pd.DataFrame(new_transactions)
+
+    report = report_metrics(summary_df, transactions_df)

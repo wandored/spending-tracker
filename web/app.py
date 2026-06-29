@@ -1,5 +1,5 @@
 from flask import Flask, render_template
-from data.metrics import FinancialReportService
+from utils.metrics import FinancialReportService
 
 app = Flask(__name__)
 
