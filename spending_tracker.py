@@ -240,7 +240,7 @@ def report_metrics(summary_df, transactions_df):
 
 
 if __name__ == "__main__":
-    import_summary, new_transactions = import_transactions()
+    # import_summary, new_transactions = import_transactions()
 
     with open(CONFIG_DIR / "categories.yaml", "r") as f:
         categories_config = yaml.safe_load(f)["categories"]
@@ -249,7 +249,7 @@ if __name__ == "__main__":
 
     normalize_descriptions()
 
-    summary_df = pd.DataFrame(import_summary)
-    transactions_df = pd.DataFrame(new_transactions)
-
-    report = report_metrics(summary_df, transactions_df)
+    # summary_df = pd.DataFrame(import_summary)
+    # transactions_df = pd.DataFrame(new_transactions)
+    #
+    # report = report_metrics(summary_df, transactions_df)
