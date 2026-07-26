@@ -5,6 +5,7 @@ import sqlite3
 @dataclass
 class FinancialSummary:
     cash_balance: float
+    current_monthly_expense: float
     avg_monthly_income: float
     avg_monthly_expense: float
     month_net: float
@@ -58,6 +59,16 @@ class FinancialReportService:
                             LIMIT 1
                         )
                     ) t ON t.account_id = a.id
+                    """,
+                ),
+                current_monthly_expense=self._scalar(
+                    conn,
+                    """
+                    SELECT COALESCE(SUM(amount), 0)
+                    FROM transactions
+                    WHERE transaction_type = 'debit'
+                      AND category <> 'Transfer'
+                      AND strftime('%Y-%m', transaction_date) = strftime('%Y-%m', 'now')
                     """,
                 ),
                 avg_monthly_income=self._scalar(

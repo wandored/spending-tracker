@@ -106,6 +106,9 @@ def import_transactions():
                         print(f"Skipping malformed transaction: {transaction}")
                         continue
 
+                    # Save original bank description
+                    transaction["raw_description"] = transaction["description"]
+
                     # clean descriptions
                     description = transaction["description"]
                     transaction["description"] = cleaner.clean(description)
@@ -118,8 +121,8 @@ def import_transactions():
                     # add account_id to transaction for reference
                     transaction["account_id"] = account_id
 
-                    # Generate a unique hash for each transaction using its date, description, type, and amount
-                    transaction_str = f"{transaction['transaction_date']}_{transaction.get('description', '')}_{transaction.get('transaction_type', '')}_{transaction['amount']}"
+                    # Generate a unique hash for each transaction using its date, raw_description, type, and amount
+                    transaction_str = f"{transaction['account_id']}_{transaction['transaction_date']}_{transaction.get('raw_description', '')}_{transaction.get('transaction_type', '')}_{transaction['amount']}"
                     transaction_hash = hashlib.sha256(
                         transaction_str.encode()
                     ).hexdigest()
@@ -132,17 +135,19 @@ def import_transactions():
                             INSERT OR IGNORE INTO transactions (
                                 account_id,
                                 transaction_date,
+                                raw_description,
                                 description,
                                 transaction_type,
                                 amount,
                                 balance,
                                 category,
                                 imported_hash
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                             (
                                 transaction["account_id"],
                                 transaction["transaction_date"],
+                                transaction["raw_description"],
                                 transaction.get("description", ""),
                                 transaction.get("transaction_type", ""),
                                 transaction["amount"],

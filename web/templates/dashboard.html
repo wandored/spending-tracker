@@ -18,10 +18,10 @@
       <div class="col">
         <div class="card">
           <div class="card-body">
-            <h6>Cash Balance</h6>
+            <h6>Currnet Month Spending</h6>
             <h3>
               ${{ "{:,.2f}".format(
-              report.summary.cash_balance
+              report.summary.current_monthly_expense
               ) }}
             </h3>
           </div>
@@ -211,10 +211,12 @@
   const monthlyTrend = {{report.monthly_trend | tojson }};
 
   const labels = monthlyTrend.map(x => x.month);
-
   const incomeData = monthlyTrend.map(x => x.income);
-
   const expenseData = monthlyTrend.map(x => x.expense);
+
+  // Constant target lines
+  const targetMin = labels.map(() => 8500);
+  const targetMax = labels.map(() => 15000);
 
   const ctx = document.getElementById(
     "incomeExpenseChart"
@@ -234,6 +236,22 @@
         {
           label: "Expense",
           data: expenseData,
+        },
+        {
+          type: "line",
+          label: "Target Min",
+          data: targetMin,
+          borderDash: [8, 5],
+          pointRadius: 0,
+          borderWidth: 2,
+        },
+        {
+          type: "line",
+          label: "Target Max",
+          data: targetMax,
+          borderDash: [8, 5],
+          pointRadius: 0,
+          borderWidth: 2,
         }
       ]
     },
