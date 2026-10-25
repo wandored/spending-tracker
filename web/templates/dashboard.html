@@ -1,24 +1,126 @@
-<!DOCTYPE html <html>
+<!DOCTYPE html>
+<html lang="en">
 
 <head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Spending Tracker</title>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --theme-blue: #6096b4;
+      --theme-sky: #93bfcf;
+      --theme-mist: #bdcdd6;
+      --theme-cream: #eee9da;
+      --theme-ink: #243e4d;
+      --status-green: #bdd8c7;
+      --status-yellow: #ead9a6;
+      --status-red: #e4bdb8;
+    }
+    body {
+      margin: 0;
+      background: var(--theme-cream);
+      color: var(--theme-ink);
+      font-family: system-ui, sans-serif;
+      line-height: 1.5;
+    }
+    .dashboard {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem clamp(1rem, 3vw, 3rem) 3rem;
+    }
+    .dashboard-header {
+      border-bottom: 3px solid var(--theme-sky);
+      padding-bottom: 1.25rem;
+      margin-bottom: 1.75rem;
+    }
+    h1 { font-size: clamp(1.8rem, 3vw, 2.5rem); font-weight: 700; margin: 0; }
+    .dashboard-header p { margin: .5rem 0 0; color: #496574; }
+    .section-title { font-size: 1.15rem; font-weight: 650; margin: 0 0 1rem; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; }
+    .average-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dashboard-section { margin-top: 1.75rem; }
+    .card {
+      height: 100%;
+      background: #faf9f5;
+      border: 1px solid var(--theme-mist);
+      border-radius: 14px;
+      box-shadow: 0 3px 12px rgba(36, 62, 77, .05);
+      overflow: hidden;
+    }
+    .card-body { padding: 1.25rem; }
+    .metric-grid .card { border-top: 4px solid var(--theme-blue); }
+    .average-grid .card { background: #dce8eb; border-top-color: var(--theme-sky); }
+    .card h6 { font-size: .85rem; font-weight: 600; margin: 0 0 .75rem; }
+    .card h3 { font-size: clamp(1.35rem, 2vw, 1.85rem); font-weight: 700; margin: 0; font-variant-numeric: tabular-nums; }
+    .chart-container { position: relative; height: 360px; }
+    .chart-caption { color: #496574; font-size: .85rem; margin: .5rem 0 1.25rem; }
+    .table-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+    .table-scroll { overflow-x: auto; }
+    .table {
+      --bs-table-bg: transparent;
+      --bs-table-color: var(--theme-ink);
+      --bs-table-striped-bg: #93bfcf20;
+      --bs-table-striped-color: var(--theme-ink);
+      --bs-table-border-color: var(--theme-mist);
+      width: 100%;
+      margin: 0;
+      font-size: .9rem;
+    }
+    .table thead { background: var(--theme-mist); }
+    .table th, .table td { padding: .8rem; vertical-align: middle; }
+    .table th { font-size: .8rem; font-weight: 650; white-space: nowrap; }
+    .table td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    @media (max-width: 1000px) {
+      .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .table-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 540px) {
+      .metric-grid { grid-template-columns: 1fr; }
+      .card-body { padding: 1rem; }
+      .chart-container { height: 280px; }
+    }
+    .card.negative-balance {
+      background-color: var(--status-red);
+      color: var(--theme-ink);
+    }
+    .card.positive-balance {
+      background-color: var(--status-green);
+      color: var(--theme-ink);
+    }
+  </style>
 </head>
 
 <body>
 
-  <div class="container mt-4">
+  <main class="dashboard">
+    <header class="dashboard-header">
+      <h1>Spending Dashboard</h1>
+      <p>Your spending, balances, and monthly trends at a glance.</p>
+    </header>
+    <h2 class="section-title">Spending overview</h2>
 
-    <h1>Spending Dashboard</h1>
-
-    <div class="row">
+    <div class="metric-grid">
 
       <div class="col">
         <div class="card">
           <div class="card-body">
-            <h6>Currnet Month Spending</h6>
+            <h6>This Week's Spending</h6>
+            <h3>
+              ${{ "{:,.2f}".format(
+              report.summary.current_week_expense
+              ) }}
+            </h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card">
+          <div class="card-body">
+            <h6>This Month's Spending</h6>
             <h3>
               ${{ "{:,.2f}".format(
               report.summary.current_monthly_expense
@@ -27,6 +129,35 @@
           </div>
         </div>
       </div>
+
+      <div class="col">
+        <div class="card">
+          <div class="card-body">
+            <h6>This Year's Spending</h6>
+            <h3>
+              ${{ "{:,.2f}".format(
+              report.summary.current_year_expense
+              ) }}
+            </h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card">
+          <div class="card-body">
+            <h6>Last 12 Month's Spending</h6>
+            <h3>
+              ${{ "{:,.2f}".format(
+              report.summary.last_12_month_expense
+              ) }}
+            </h3>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="metric-grid average-grid dashboard-section">
 
       <div class="col">
         <div class="card">
@@ -54,157 +185,165 @@
         </div>
       </div>
 
-      <div class="row mt-4">
-
-        <div class="col">
-          <div class="card">
-            <div class="card-body">
-              <h6>Trailing 12 Month Balance</h6>
-              <h3>
-                ${{ "{:,.2f}".format(
-                report.summary.trailing_12_month_net
-                ) }}
-              </h3>
-            </div>
-          </div>
-        </div>
-
-        <div class="col">
-          <div class="card">
-            <div class="card-body">
-              <h6>Current Month Balance</h6>
-              <h3>
-                ${{ "{:,.2f}".format(
-                report.summary.month_net
-                ) }}
-              </h3>
-            </div>
-          </div>
-        </div>
-
-        <div class="col">
-          <div class="card">
-            <div class="card-body">
-              <h6>Current Quarter Balance</h6>
-              <h3>
-                ${{ "{:,.2f}".format(
-                report.summary.quarter_net
-                ) }}
-              </h3>
-            </div>
-          </div>
-        </div>
-
-        <div class="col">
-          <div class="card">
-            <div class="card-body">
-              <h6>Current Year Balance</h6>
-              <h3>
-                ${{ "{:,.2f}".format(
-                report.summary.year_net
-                ) }}
-              </h3>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
     </div>
+    <section class="dashboard-section">
+    <h2 class="section-title">Balances</h2>
+    <div class="metric-grid">
 
-    <div class="container mt-4">
-
-      <div class="row mt-4">
-
-        <div class="col-12">
-
-          <div class="card">
-            <div class="card-body">
-
-              <h4>Income vs Expense</h4>
-
-              <canvas id="incomeExpenseChart"></canvas>
-
-            </div>
-          </div>
-
-        </div>
-
-      </div>
-    </div>
-    <div class="row">
-      <h3 class="mt-4">Top 10 Expenses</h3>
       <div class="col">
-        <div class="card">
+        <div class="card{% if report.summary.trailing_12_month_net < 0 %} negative-balance{% elif report.summary.trailing_12_month_net > 0 %} positive-balance{% endif %}">
           <div class="card-body">
-
-            <table class="table table-striped">
-              <thead>
-                <tr>
-                  <th>Description</th>
-                  <th>Total</th>
-                  <th>Count</th>
-                  <th class="text-end">Avg</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {% for expense in report.top_descriptions %}
-                <tr>
-                  <td>{{ expense.description }}</td>
-                  <td>
-                    ${{ "{:,.2f}".format(expense.total) }}
-                  </td>
-                  <td>
-                    {{ (expense.count) }}
-                  </td>
-                  <td class="text-end">
-                    ${{ "{:,.2f}".format(expense.transaction_average) }}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+            <h6>Trailing 12 Month Balance</h6>
+            <h3>
+              ${{ "{:,.2f}".format(
+              report.summary.trailing_12_month_net
+              ) }}
+            </h3>
           </div>
         </div>
       </div>
 
       <div class="col">
+        <div class="card{% if report.summary.month_net < 0 %} negative-balance{% elif report.summary.month_net > 0 %} positive-balance{% endif %}">
+          <div class="card-body">
+            <h6>Current Month Balance</h6>
+            <h3>
+              ${{ "{:,.2f}".format(
+              report.summary.month_net
+              ) }}
+            </h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card{% if report.summary.quarter_net < 0 %} negative-balance{% elif report.summary.quarter_net > 0 %} positive-balance{% endif %}">
+          <div class="card-body">
+            <h6>Current Quarter Balance</h6>
+            <h3>
+              ${{ "{:,.2f}".format(
+              report.summary.quarter_net
+              ) }}
+            </h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="card{% if report.summary.year_net < 0 %} negative-balance{% elif report.summary.year_net > 0 %} positive-balance{% endif %}">
+          <div class="card-body">
+            <h6>Current Year Balance</h6>
+            <h3>
+              ${{ "{:,.2f}".format(
+              report.summary.year_net
+              ) }}
+            </h3>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    </section>
+
+  <section class="dashboard-section">
+    <div>
+
+      <div class="col-12">
+
         <div class="card">
           <div class="card-body">
-            <table class="table table-striped">
-              <thead>
-                <tr>
-                  <th>Category</th>
-                  <th>Total</th>
-                  <th>Avg</th>
-                  <th class="text-end">Count</th>
-                </tr>
-              </thead>
 
-              <tbody>
-                {% for expense in report.top_categories %}
-                <tr>
-                  <td>{{ expense.category }}</td>
-                  <td>
-                    ${{ "{:,.2f}".format(expense.total) }}
-                  </td>
-                  <td>
-                    {{ "{:,.1f}".format(expense.percentage_of_total) }}%
-                  </td>
-                  <td class="text-end">
-                    {{ (expense.count) }}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+            <h2 class="section-title">Income vs Expense</h2>
+            <p class="chart-caption">Monthly expenses · Green: below $12,500 · Yellow: $12,500–$14,999.99 · Red: $15,000 and above</p>
+            <div class="chart-container"><canvas id="incomeExpenseChart" role="img" aria-label="Monthly expenses with target minimum and maximum lines"></canvas></div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+  <section class="dashboard-section">
+    <h2 class="section-title">Expense breakdown</h2>
+    <div class="table-grid">
+    <div class="col">
+      <div class="card">
+        <div class="card-body">
+
+          <h3 class="section-title">Top 10 Expenses</h3>
+          <div class="table-scroll">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Total</th>
+                <th>Count</th>
+                <th class="text-end">Avg</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for expense in report.top_descriptions %}
+              <tr>
+                <td>{{ expense.description }}</td>
+                <td>
+                  ${{ "{:,.2f}".format(expense.total) }}
+                </td>
+                <td>
+                  {{ (expense.count) }}
+                </td>
+                <td class="text-end">
+                  ${{ "{:,.2f}".format(expense.transaction_average) }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
           </div>
         </div>
       </div>
     </div>
 
-</body>
+    <div class="col">
+      <div class="card">
+        <div class="card-body">
+          <h3 class="section-title">By category</h3>
+          <div class="table-scroll">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Total</th>
+                <th>Avg</th>
+                <th class="text-end">Count</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for expense in report.top_categories %}
+              <tr>
+                <td>{{ expense.category }}</td>
+                <td>
+                  ${{ "{:,.2f}".format(expense.total) }}
+                </td>
+                <td>
+                  {{ "{:,.1f}".format(expense.percentage_of_total) }}%
+                </td>
+                <td class="text-end">
+                  {{ (expense.count) }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </section>
+  </main>
 
 <script>
 
@@ -213,6 +352,10 @@
   const labels = monthlyTrend.map(x => x.month);
   const incomeData = monthlyTrend.map(x => x.income);
   const expenseData = monthlyTrend.map(x => x.expense);
+  const theme = getComputedStyle(document.documentElement);
+  const expenseGreen = theme.getPropertyValue("--status-green").trim();
+  const expenseYellow = theme.getPropertyValue("--status-yellow").trim();
+  const expenseRed = theme.getPropertyValue("--status-red").trim();
 
   // Constant target lines
   const targetMin = labels.map(() => 8500);
@@ -230,16 +373,18 @@
 
       datasets: [
         {
-          label: "Income",
-          data: incomeData,
-        },
-        {
           label: "Expense",
           data: expenseData,
+          borderRadius: 5,
+          maxBarThickness: 42,
+          backgroundColor: expenseData.map(amount =>
+            amount < 12500 ? expenseGreen : amount < 15000 ? expenseYellow : expenseRed
+          ),
         },
         {
           type: "line",
           label: "Target Min",
+          borderColor: "#6096b4",
           data: targetMin,
           borderDash: [8, 5],
           pointRadius: 0,
@@ -248,6 +393,7 @@
         {
           type: "line",
           label: "Target Max",
+          borderColor: "#496574",
           data: targetMax,
           borderDash: [8, 5],
           pointRadius: 0,
@@ -258,6 +404,11 @@
 
     options: {
       responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom", labels: { color: "#243e4d", padding: 20 } },
+        tooltip: { backgroundColor: "#243e4d", padding: 12, cornerRadius: 8 }
+      },
 
       interaction: {
         mode: "index",
@@ -265,8 +416,11 @@
       },
 
       scales: {
+        x: { grid: { display: false }, ticks: { color: "#496574" } },
         y: {
-          beginAtZero: true
+          beginAtZero: true,
+          grid: { color: "#bdcdd660" },
+          ticks: { color: "#496574", callback: value => "$" + value.toLocaleString() }
         }
       }
     }
@@ -274,4 +428,5 @@
 
 </script>
 
+</body>
 </html>
