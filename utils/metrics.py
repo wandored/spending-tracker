@@ -4,7 +4,10 @@ import sqlite3
 
 @dataclass
 class FinancialSummary:
-    cash_balance: float
+    current_week_expense: float
+    current_monthly_expense: float
+    current_year_expense: float
+    last_12_month_expense: float
     avg_monthly_income: float
     avg_monthly_expense: float
     month_net: float
@@ -33,31 +36,45 @@ class FinancialReportService:
             # -------------------------
 
             summary = FinancialSummary(
-                cash_balance=self._scalar(
+                current_week_expense=self._scalar(
                     conn,
                     """
-                    SELECT ROUND(
-                        SUM(
-                            CASE
-                                WHEN a.account_type IN ('checking', 'savings')
-                                    THEN t.balance
-                                WHEN a.account_type = 'credit'
-                                    THEN -t.balance
-                                ELSE 0
-                            END
-                        ), 2)
-                    FROM accounts a
-                    JOIN (
-                        SELECT account_id, balance
-                        FROM transactions t1
-                        WHERE id = (
-                            SELECT id
-                            FROM transactions t2
-                            WHERE t2.account_id = t1.account_id
-                            ORDER BY transaction_date DESC, id DESC
-                            LIMIT 1
-                        )
-                    ) t ON t.account_id = a.id
+                    SELECT COALESCE(SUM(amount), 0)
+                    FROM transactions
+                    WHERE transaction_type = 'debit'
+                      AND category <> 'Transfer'
+                      AND transaction_date >= date('now', '-6 days', 'weekday 1')
+                      AND transaction_date < date('now', '+1 day', 'weekday 1')
+                    """,
+                ),
+                current_monthly_expense=self._scalar(
+                    conn,
+                    """
+                    SELECT COALESCE(SUM(amount), 0)
+                    FROM transactions
+                    WHERE transaction_type = 'debit'
+                      AND category <> 'Transfer'
+                      AND strftime('%Y-%m', transaction_date) = strftime('%Y-%m', 'now')
+                    """,
+                ),
+                current_year_expense=self._scalar(
+                    conn,
+                    """
+                    SELECT COALESCE(SUM(amount), 0)
+                    FROM transactions
+                    WHERE transaction_type = 'debit'
+                      AND category <> 'Transfer'
+                      AND strftime('%Y', transaction_date) = strftime('%Y', 'now')
+                    """,
+                ),
+                last_12_month_expense=self._scalar(
+                    conn,
+                    """
+                    SELECT COALESCE(SUM(amount), 0)
+                    FROM transactions
+                    WHERE transaction_type = 'debit'
+                      AND category <> 'Transfer'
+                      AND transaction_date >= date('now', '-12 months')
                     """,
                 ),
                 avg_monthly_income=self._scalar(

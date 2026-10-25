@@ -1,0 +1,20 @@
+services:
+  spending-tracker:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+
+    container_name: spending-tracker
+
+    ports:
+      - "5000:5000"
+
+    volumes:
+      - .:/app
+
+    environment:
+      - PYTHONPATH=/app
+
+    command: python -m web.app
+
+    restart: unless-stopped

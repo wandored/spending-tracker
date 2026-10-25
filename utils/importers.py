@@ -97,6 +97,8 @@ class CitiImporter:
 
             for row in reader:
                 _status, date, description, debit, credit = row[:5]
+                debit = debit.replace("$", "").replace(",", "").replace(" ", "").strip()
+                credit = credit.replace("$", "").replace(",", "").replace(" ", "").strip()
 
                 # convert date to YYYY-MM-DD format
                 try:

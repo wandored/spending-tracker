@@ -16,6 +16,7 @@ from utils.metrics import FinancialReportService
 from utils.description_cleaner import DescriptionCleaner
 from utils.category_manager import CategoryManager
 from pathlib import Path
+from datetime import datetime
 
 
 PROJECT_ROOT = Path(__file__).parent
@@ -106,6 +107,9 @@ def import_transactions():
                         print(f"Skipping malformed transaction: {transaction}")
                         continue
 
+                    # Save original bank description
+                    transaction["raw_description"] = transaction["description"]
+
                     # clean descriptions
                     description = transaction["description"]
                     transaction["description"] = cleaner.clean(description)
@@ -118,8 +122,8 @@ def import_transactions():
                     # add account_id to transaction for reference
                     transaction["account_id"] = account_id
 
-                    # Generate a unique hash for each transaction using its date, description, type, and amount
-                    transaction_str = f"{transaction['transaction_date']}_{transaction.get('description', '')}_{transaction.get('transaction_type', '')}_{transaction['amount']}"
+                    # Generate a unique hash for each transaction using its date, raw_description, type, and amount
+                    transaction_str = f"{transaction['account_id']}_{transaction['transaction_date']}_{transaction.get('raw_description', '')}_{transaction.get('transaction_type', '')}_{transaction['amount']}"
                     transaction_hash = hashlib.sha256(
                         transaction_str.encode()
                     ).hexdigest()
@@ -132,17 +136,19 @@ def import_transactions():
                             INSERT OR IGNORE INTO transactions (
                                 account_id,
                                 transaction_date,
+                                raw_description,
                                 description,
                                 transaction_type,
                                 amount,
                                 balance,
                                 category,
                                 imported_hash
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                             (
                                 transaction["account_id"],
                                 transaction["transaction_date"],
+                                transaction["raw_description"],
                                 transaction.get("description", ""),
                                 transaction.get("transaction_type", ""),
                                 transaction["amount"],
@@ -213,6 +219,50 @@ def normalize_descriptions():
                 updated += 1
 
         conn.commit()
+
+
+def add_account_balance(account_id, balance, balance_date=None):
+    if balance_date is None:
+        balance_date = datetime.now().strftime("%Y-%m-%d")
+
+    description = "Balance Snapshot"
+
+    transaction_str = f"{account_id}_{balance_date}_{description}_{balance}"
+
+    imported_hash = hashlib.sha256(transaction_str.encode()).hexdigest()
+
+    with sqlite3.connect(str(DB_PATH)) as conn:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO transactions (
+                account_id,
+                transaction_date,
+                description,
+                transaction_type,
+                amount,
+                balance,
+                category,
+                imported_hash
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                account_id,
+                balance_date,
+                description,
+                "balance",
+                0,
+                balance,
+                "Balance",
+                imported_hash,
+            ),
+        )
+
+        conn.commit()
+
+        return cursor.rowcount == 1
 
 
 def report_metrics(summary_df, transactions_df):
