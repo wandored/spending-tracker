@@ -207,6 +207,9 @@ class FinancialReportService:
                     FROM transactions
                     WHERE category <> 'Transfer'
                     GROUP BY month
+                ),
+                displayed_months AS (
+                    SELECT * FROM monthly_totals
                     ORDER BY month DESC
                     LIMIT 12
                 )
@@ -214,8 +217,22 @@ class FinancialReportService:
                     month,
                     ROUND(income, 2) AS income,
                     ROUND(expense, 2) AS expense,
-                    ROUND(income - expense, 2) AS net
-                FROM monthly_totals
+                    ROUND(income - expense, 2) AS net,
+                    ROUND((
+                        SELECT SUM(history.income - history.expense) / 12.0
+                        FROM monthly_totals history
+                        WHERE history.month BETWEEN
+                            strftime('%Y-%m', current.month || '-01', '-11 months')
+                            AND current.month
+                    ), 2) AS average_net_income,
+                    ROUND((
+                        SELECT SUM(history.expense) / 12.0
+                        FROM monthly_totals history
+                        WHERE history.month BETWEEN
+                            strftime('%Y-%m', current.month || '-01', '-11 months')
+                            AND current.month
+                    ), 2) AS average_monthly_expense
+                FROM displayed_months current
                 ORDER BY month
                 """,
             )
@@ -274,6 +291,28 @@ class FinancialReportService:
             )
 
             # -------------------------
+            # Top Accounts
+            # -------------------------
+
+            top_accounts = self._query(
+                conn,
+                """
+                SELECT
+                    a.account_name,
+                    ROUND(SUM(t.amount), 2) AS total,
+                    COUNT(*) AS count,
+                    ROUND(AVG(t.amount), 2) AS transaction_average
+                FROM transactions t
+                JOIN accounts a ON a.id = t.account_id
+                WHERE t.transaction_type='debit'
+                  AND t.category <> 'Transfer'
+                  AND t.transaction_date >= date('now', '-12 months')
+                GROUP BY a.id, a.account_name
+                ORDER BY total DESC, a.account_name
+                """,
+            )
+
+            # -------------------------
             # Top Categories
             # -------------------------
 
@@ -309,5 +348,6 @@ class FinancialReportService:
             "account_balances": account_balances,
             "monthly_trend": monthly_trend,
             "top_descriptions": top_descriptions,
+            "top_accounts": top_accounts,
             "top_categories": top_categories,
         }

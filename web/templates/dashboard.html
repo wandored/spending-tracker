@@ -57,7 +57,11 @@
     .card h3 { font-size: clamp(1.35rem, 2vw, 1.85rem); font-weight: 700; margin: 0; font-variant-numeric: tabular-nums; }
     .chart-container { position: relative; height: 360px; }
     .chart-caption { color: #496574; font-size: .85rem; margin: .5rem 0 1.25rem; }
-    .table-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+    .table-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    .table-grid .card-body { padding: .85rem; }
+    .table-grid .card h3 { font-size: 1.15rem; margin-bottom: .75rem; }
+    .table-grid .table { font-size: .8rem; }
+    .table-grid .table th, .table-grid .table td { padding: .5rem .35rem; }
     .table-scroll { overflow-x: auto; }
     .table {
       --bs-table-bg: transparent;
@@ -254,8 +258,8 @@
           <div class="card-body">
 
             <h2 class="section-title">Income vs Expense</h2>
-            <p class="chart-caption">Monthly expenses · Green: below $12,500 · Yellow: $12,500–$14,999.99 · Red: $15,000 and above</p>
-            <div class="chart-container"><canvas id="incomeExpenseChart" role="img" aria-label="Monthly expenses with target minimum and maximum lines"></canvas></div>
+            <p class="chart-caption">Monthly expenses · Green: more than $500 below rolling average expenses · Yellow: within $500 of rolling average expenses · Red: more than $500 above rolling average expenses · Purple line: average net income · Orange line: average expenses · Each average covers the 12 months ending in that month</p>
+            <div class="chart-container"><canvas id="incomeExpenseChart" role="img" aria-label="Monthly expenses with rolling 12-month average net income and expense lines"></canvas></div>
 
           </div>
         </div>
@@ -265,13 +269,13 @@
     </div>
   </section>
   <section class="dashboard-section">
-    <h2 class="section-title">Expense breakdown</h2>
+    <h2 class="section-title">Top Expenses</h2>
     <div class="table-grid">
     <div class="col">
       <div class="card">
         <div class="card-body">
 
-          <h3 class="section-title">Top 10 Expenses</h3>
+          <h3 class="section-title">By Description</h3>
           <div class="table-scroll">
           <table class="table table-striped">
             <thead>
@@ -287,6 +291,43 @@
               {% for expense in report.top_descriptions %}
               <tr>
                 <td>{{ expense.description }}</td>
+                <td>
+                  ${{ "{:,.2f}".format(expense.total) }}
+                </td>
+                <td>
+                  {{ (expense.count) }}
+                </td>
+                <td class="text-end">
+                  ${{ "{:,.2f}".format(expense.transaction_average) }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card">
+        <div class="card-body">
+          <h3 class="section-title">By Account</h3>
+          <div class="table-scroll">
+          <table class="table table-striped">
+            <thead>
+              <tr>
+                <th>Account</th>
+                <th>Total</th>
+                <th>Count</th>
+                <th class="text-end">Avg</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for expense in report.top_accounts %}
+              <tr>
+                <td>{{ expense.account_name }}</td>
                 <td>
                   ${{ "{:,.2f}".format(expense.total) }}
                 </td>
@@ -352,14 +393,12 @@
   const labels = monthlyTrend.map(x => x.month);
   const incomeData = monthlyTrend.map(x => x.income);
   const expenseData = monthlyTrend.map(x => x.expense);
+  const averageNetIncome = monthlyTrend.map(x => x.average_net_income);
+  const averageMonthlyExpense = monthlyTrend.map(x => x.average_monthly_expense);
   const theme = getComputedStyle(document.documentElement);
   const expenseGreen = theme.getPropertyValue("--status-green").trim();
   const expenseYellow = theme.getPropertyValue("--status-yellow").trim();
   const expenseRed = theme.getPropertyValue("--status-red").trim();
-
-  // Constant target lines
-  const targetMin = labels.map(() => 8500);
-  const targetMax = labels.map(() => 15000);
 
   const ctx = document.getElementById(
     "incomeExpenseChart"
@@ -377,27 +416,28 @@
           data: expenseData,
           borderRadius: 5,
           maxBarThickness: 42,
-          backgroundColor: expenseData.map(amount =>
-            amount < 12500 ? expenseGreen : amount < 15000 ? expenseYellow : expenseRed
+          backgroundColor: expenseData.map((amount, index) =>
+            amount > averageMonthlyExpense[index] + 500 ? expenseRed :
+              amount < averageMonthlyExpense[index] - 500 ? expenseGreen : expenseYellow
           ),
         },
         {
           type: "line",
-          label: "Target Min",
-          borderColor: "#6096b4",
-          data: targetMin,
-          borderDash: [8, 5],
+          label: "Rolling 12-Month Average Net Income",
+          borderColor: "#8064a2",
+          data: averageNetIncome,
           pointRadius: 0,
-          borderWidth: 2,
+          borderWidth: 3,
+          order: -1,
         },
         {
           type: "line",
-          label: "Target Max",
-          borderColor: "#496574",
-          data: targetMax,
-          borderDash: [8, 5],
+          label: "Rolling 12-Month Average Expenses",
+          borderColor: "#b86e28",
+          data: averageMonthlyExpense,
           pointRadius: 0,
-          borderWidth: 2,
+          borderWidth: 3,
+          order: -1,
         }
       ]
     },
